@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 public class SubredditService {
 
     private final SubredditRepository subredditRepository;
+    private final AuthService authService;
 
     @Transactional
     public SubredditDto save(SubredditDto subredditDto){
@@ -27,14 +28,13 @@ public class SubredditService {
     }
 
     private Subreddit mapSubredditDto(SubredditDto subredditDto) {
-        return Subreddit.builder().name(subredditDto.getName()).description(subredditDto.getDescription()).build();
+        return Subreddit.builder().name(subredditDto.getName()).description(subredditDto.getDescription()).user(authService.getCurrentUser()).build();
     }
 
     @Transactional(readOnly = true)
     public List<SubredditDto> getAll() {
         return subredditRepository.findAll().stream().map(this::mapToDto).collect(Collectors.toList());
     }
-
 
     private SubredditDto mapToDto(Subreddit subreddit) {
         return SubredditDto.builder().name(subreddit.getName()).id(subreddit.getId()).numberOfPosts(subreddit.getPosts().size()).build();
