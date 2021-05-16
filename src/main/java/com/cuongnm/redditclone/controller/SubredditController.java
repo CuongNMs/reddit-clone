@@ -24,10 +24,14 @@ public class SubredditController {
         return ResponseEntity.status(HttpStatus.OK).body(subredditService.getAll());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<SubredditDto> getSubreddit(@PathVariable Long id){
+        return ResponseEntity.status(HttpStatus.OK).body(subredditService.getSubreddit(id));
+    }
+
     @PostMapping
     public ResponseEntity<SubredditDto> createSubreddit(@RequestBody SubredditDto subredditDto){
         return ResponseEntity.status(HttpStatus.CREATED).body(subredditService.save(subredditDto));
     }
-
 
 }

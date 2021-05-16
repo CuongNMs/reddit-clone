@@ -1,6 +1,7 @@
 package com.cuongnm.redditclone.service;
 
 import com.cuongnm.redditclone.dto.SubredditDto;
+import com.cuongnm.redditclone.exception.SpringRedditException;
 import com.cuongnm.redditclone.model.Subreddit;
 import com.cuongnm.redditclone.repository.SubredditRepository;
 import lombok.AllArgsConstructor;
@@ -40,4 +41,8 @@ public class SubredditService {
         return SubredditDto.builder().name(subreddit.getName()).id(subreddit.getId()).numberOfPosts(subreddit.getPosts().size()).build();
     }
 
+    public SubredditDto getSubreddit(Long id) {
+        Subreddit subreddit = subredditRepository.findById(id).orElseThrow(() -> new SpringRedditException("No subreddit found with id: " + id));
+        return SubredditDto.builder().name(subreddit.getName()).id(id).numberOfPosts(subreddit.getPosts().size()).description(subreddit.getDescription()).build();
+    }
 }

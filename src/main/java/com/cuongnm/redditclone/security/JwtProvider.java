@@ -3,8 +3,8 @@ package com.cuongnm.redditclone.security;
 import com.cuongnm.redditclone.exception.SpringRedditException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -13,14 +13,16 @@ import java.io.InputStream;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
-
-import static java.util.Date.from;
 
 @Service
 public class JwtProvider {
 
     private KeyStore keyStore;
+
+    @Value("${jwt.expiration.time}")
+    private Long jwtExpirationInMillis;
 
     @PostConstruct
     public void init() {
@@ -36,45 +38,81 @@ public class JwtProvider {
 
     public String generateToken(Authentication authentication) {
         org.springframework.security.core.userdetails.User principal = (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+
         return Jwts.builder()
                 .setSubject(principal.getUsername())
-                .setIssuedAt(from(Instant.now()))
+                .setIssuedAt(Date.from(Instant.now().truncatedTo(ChronoUnit.SECONDS)))
                 .signWith(getPrivateKey())
-                .setExpiration(from(Instant.now().plusMillis(1000*60*60*10)))
+                .setExpiration(Date.from(Instant.now().plus(15,ChronoUnit.MINUTES)))
                 .compact();
     }
+
+    public String generateTokenWithUsername(String username){
+        return Jwts.builder()
+                .setSubject(username)
+                .setIssuedAt(Date.from(Instant.now()))
+                .signWith(getPrivateKey())
+                .setExpiration(Date.from(Instant.now().plus(15,ChronoUnit.MINUTES)))
+                .compact();
+    }
+
 
     private PrivateKey getPrivateKey() {
         try {
             return (PrivateKey) keyStore.getKey("springblog", "secret".toCharArray());
         } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException e) {
-            throw new SpringRedditException("Exception occured while retrieving public key from keystore", e);
+            throw new SpringRedditException("Exception occured while retrieving public key from keystore");
         }
     }
 
-    public boolean validateToken(String jwt, UserDetails userDetails) {
-        final String username = getUsernameFromJwt(jwt);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(jwt));
-
+    public boolean validateToken(String jwt) {
+        Jwts.parserBuilder().setSigningKey(getPublickey()).build().parseClaimsJws(jwt);
+        return true;
     }
-
-    private boolean isTokenExpired(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(getPrivateKey())
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.getExpiration().before(new Date());
-    }
-
 
     public String getUsernameFromJwt(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(getPrivateKey())
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getPublickey())
+                .build()
                 .parseClaimsJws(token)
                 .getBody();
+
 
         return claims.getSubject();
 
+    }
+
+    public Instant getExpireDate(String token){
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getPublickey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+
+        return claims.getExpiration().toInstant();
+    }
+
+    public Instant getIssuedAt(String token){
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getPublickey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.getIssuedAt().toInstant();
+    }
+
+    private PublicKey getPublickey() {
+        try {
+            return keyStore.getCertificate("springblog").getPublicKey();
+        } catch (KeyStoreException e) {
+            throw new SpringRedditException("Exception occured while retrieving public key from keystore");
+        }
+    }
+
+    public Long getJwtExpirationInMillis() {
+        return jwtExpirationInMillis;
     }
 
 }

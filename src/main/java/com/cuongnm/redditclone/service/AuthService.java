@@ -2,6 +2,7 @@ package com.cuongnm.redditclone.service;
 
 import com.cuongnm.redditclone.dto.AuthenticationResponse;
 import com.cuongnm.redditclone.dto.LoginRequest;
+import com.cuongnm.redditclone.dto.RefreshTokenRequest;
 import com.cuongnm.redditclone.dto.RegisterRequest;
 import com.cuongnm.redditclone.exception.SpringRedditException;
 import com.cuongnm.redditclone.model.NotificationEmail;
@@ -18,14 +19,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @AllArgsConstructor
+@Transactional
 public class AuthService {
 
     private final PasswordEncoder passwordEncoder;
@@ -39,6 +41,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     private final JwtProvider jwtProvider;
+
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public void signup(RegisterRequest registerRequest){
@@ -58,7 +62,7 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    User getCurrentUser() {
+    public User getCurrentUser() {
         org.springframework.security.core.userdetails.User principal = (org.springframework.security.core.userdetails.User) SecurityContextHolder.
                 getContext().getAuthentication().getPrincipal();
         return userRepository.findByUsername(principal.getUsername())
@@ -97,10 +101,28 @@ public class AuthService {
     }
 
     public AuthenticationResponse login(LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(),
+                loginRequest.getPassword()));
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = jwtProvider.generateToken(authentication);
-        return new AuthenticationResponse(token, loginRequest.getUsername());
+        System.out.println("Expire date at response: " + jwtProvider.getExpireDate(token).toString());
+        return AuthenticationResponse.builder()
+                .authenticationToken(token)
+                .refreshToken(refreshTokenService.generateRefreshToken().getToken())
+                .expireAt(jwtProvider.getExpireDate(token))
+                .username(loginRequest.getUsername())
+                .build();
+    }
 
+    public AuthenticationResponse refreshToken(RefreshTokenRequest refreshTokenRequest){
+        refreshTokenService.validateRefreshToken(refreshTokenRequest.getRefreshToken());
+        String token = jwtProvider.generateTokenWithUsername(refreshTokenRequest.getUsername());
+        System.out.println("Expire date at response: " + jwtProvider.getExpireDate(token).toString());
+        return AuthenticationResponse.builder()
+                .authenticationToken(token)
+                .refreshToken(refreshTokenRequest.getRefreshToken())
+                .expireAt(jwtProvider.getExpireDate(token))
+                .username(refreshTokenRequest.getUsername())
+                .build();
     }
 }

@@ -29,26 +29,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String jwt = getJwtFromRequest(request);
-        String username = null;
-        if (StringUtils.hasText(jwt)) {
-            username = jwtProvider.getUsernameFromJwt(jwt);
-
-//            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-//            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails,
-//                    null, userDetails.getAuthorities());
-//            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-//
-//            SecurityContextHolder.getContext().setAuthentication(authentication);
-        }
-        if(username != null && SecurityContextHolder.getContext().getAuthentication() == null){
+        if (StringUtils.hasText(jwt) && jwtProvider.validateToken(jwt)) {
+            String username = jwtProvider.getUsernameFromJwt(jwt);
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-            if(jwtProvider.validateToken(jwt, userDetails)){
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails,
-                   null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails,
+                    null, userDetails.getAuthorities());
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
         }
+
         filterChain.doFilter(request, response);
     }
 
